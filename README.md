@@ -49,6 +49,7 @@ pip install -r requirements.txt
 | 03 | `03_cyclonedds/` | Can you access DDS topics directly? (Linux + EDU/firmware) |
 | 04 | `04_highlevel_api/` | Can you send movement commands (move, sit, stand)? |
 | 05 | `05_virtual_controller/` | Can you inject controller button presses from your computer? |
+| 06 | `06_audio/` | Can you access audio features (speaker, microphone, file playback)? |
 
 ---
 
@@ -88,6 +89,8 @@ Tested over **WiFi STA mode** (Go2 connected to home router) using
 | Camera video | WebRTC video channel | ~12.5 fps | 1280×720 H.264; use `conn.video.add_track_callback()` |
 | Sport commands | `rt/api/sport/request` | on demand | See **Sport Commands** section below |
 | Motion mode switching | `rt/api/motion_switcher/request` | on demand | Read current mode, switch between `normal` / `ai` / etc. |
+| Audio control API | `rt/api/audiohub/request` | on demand | Upload, play, delete audio files; query list & play mode. API works but **no speaker on Air**. |
+| Audio player state | `rt/audiohub/player/state` | ~3 Hz | Reports play state, current track — streams even without speaker hardware |
 
 ### What does NOT work on Air
 
@@ -99,6 +102,8 @@ Tested over **WiFi STA mode** (Go2 connected to home router) using
 | Virtual controller injection | `rt/wirelesscontroller` (write) | Data channel accepts messages but firmware ignores them |
 | Direct LAN (Ethernet) | 192.168.123.161 | Responds briefly then drops; not usable on Air without firmware mod |
 | CycloneDDS topics | DDS over LAN | Requires EDU or firmware unlock |
+| Speaker output | audiohub play | **Go2 Air has no speaker hardware** — Pro/EDU only. API accepts play commands and reports `is_playing: True` but no sound is produced. |
+| Microphone stream | WebRTC audio track | No audio frames received — Air has no microphone hardware |
 
 ### Sport Commands — Tested on Go2 Air
 
