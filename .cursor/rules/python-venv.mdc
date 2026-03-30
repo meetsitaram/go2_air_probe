@@ -1,0 +1,43 @@
+---
+description: Use the project uv virtualenv for all Python and pip commands
+alwaysApply: true
+---
+
+# Python environment (uv)
+
+This project uses a **uv-managed virtual environment** at `.venv` (repo root).
+
+## Mandatory: activate the venv in every shell session
+
+Before running **any** `python`, `pip`, `uv pip`, or project script in a Shell call,
+**always** prefix with venv activation in the same command:
+
+```bash
+source /home/stickbot/projects/go2_air_probe/.venv/bin/activate && <your command>
+```
+
+Do this automatically every time — never ask the user to activate or click run separately.
+
+## Before running any project script
+
+1. **Activate** the venv (as above).
+2. **Install deps** if they may be missing: `pip install -r requirements.txt`
+3. Then run the script.
+
+Combine these into a single shell command so the user only has to approve once:
+
+```bash
+source /home/stickbot/projects/go2_air_probe/.venv/bin/activate && pip install -r requirements.txt && python run_all.py
+```
+
+## Never use bare python/pip
+
+Do **not** use bare `python`, `python3`, `pip`, or `pip3` without activating the venv first.
+
+## If the venv is missing
+
+Recreate it in a single command:
+
+```bash
+cd /home/stickbot/projects/go2_air_probe && uv venv && source .venv/bin/activate && pip install -r requirements.txt
+```

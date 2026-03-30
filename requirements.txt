@@ -1,0 +1,21 @@
+# Go2 Air Probe — Python dependencies
+#
+# System dependencies (install before pip):
+#   Linux (Debian/Ubuntu):  sudo apt install -y portaudio19-dev
+#   macOS:                  brew install portaudio
+
+# WebRTC-based access (works on all Go2 models: Air, Pro, EDU)
+# Works on Linux, Mac, Windows
+unitree_webrtc_connect
+
+# Official Unitree Python SDK (CycloneDDS-based)
+# Linux only — not on PyPI, installed from GitHub
+# Confirmed working on EDU; on Air/Pro requires firmware unlock or same LAN as internal DDS
+unitree_sdk2py @ git+https://github.com/unitreerobotics/unitree_sdk2_python.git
+
+# Utilities
+numpy
+opencv-python       # camera frame decoding / display
+aiortc              # WebRTC engine (also a dependency of unitree_webrtc_connect)
+flask               # used by LiDAR visualization example
+flask-socketio      # used by LiDAR visualization example
