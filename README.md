@@ -48,7 +48,7 @@ pip install -r requirements.txt
 | 02 | `02_webrtc/` | Can you open a WebRTC connection and read live data? |
 | 03 | `03_cyclonedds/` | Can you access DDS topics directly? (Linux + EDU/firmware) |
 | 04 | `04_highlevel_api/` | Can you send movement commands (move, sit, stand)? |
-| 05 | `05_virtual_controller/` | Can you inject controller button presses from your computer? |
+| 05 | `05_custom_controller/` | Keyboard and Xbox gamepad controllers for the Go2 |
 | 06 | `06_audio/` | Can you access audio features (speaker, microphone, file playback)? |
 
 ---
@@ -90,20 +90,23 @@ Tested over **WiFi STA mode** (Go2 connected to home router) using
 | Sport commands | `rt/api/sport/request` | on demand | See **Sport Commands** section below |
 | Motion mode switching | `rt/api/motion_switcher/request` | on demand | Read current mode, switch between `normal` / `ai` / etc. |
 | Audio control API | `rt/api/audiohub/request` | on demand | Upload, play, delete audio files; query list & play mode. API works but **no speaker on Air**. |
-| Audio player state | `rt/audiohub/player/state` | ~3 Hz | Reports play state, current track — streams even without speaker hardware |
+| Audio player state | `rt/audiohub/player/state` | ~4 Hz | Reports play state, current track — streams even without speaker hardware |
+| Sport mode state (lf) | `rt/lf/sportmodestate` | ~20 Hz | Full robot state: IMU quaternion, velocity, gait mode, error code |
+| LiDAR point cloud | `rt/utlidar/voxel_map_compressed` | ~8 Hz | Compressed voxel map with positions + faces (binary) |
+| Device settings | `rt/multiplestate` | ~0.4 Hz | Brightness, volume, obstacle avoidance switch |
 
 ### What does NOT work on Air
 
 | Capability | Topic | Notes |
 |-----------|-------|-------|
-| Sport mode state | `rt/sportmodestate` | No messages; likely EDU/Pro only via DDS |
-| Wireless controller (read) | `rt/wirelesscontroller` | No messages; controller input not exposed over WebRTC |
-| LiDAR point cloud | `rt/utlidar/voxel_map_compressed` | No data; LiDAR runs internally but point cloud not streamed |
+| Sport mode state (non-lf) | `rt/sportmodestate` | No messages; use `rt/lf/sportmodestate` instead |
+| Wireless controller (read) | `rt/wirelesscontroller` | No messages; full topic scan (45 topics + raw tap) confirms no controller data on any channel |
 | Virtual controller injection | `rt/wirelesscontroller` (write) | Data channel accepts messages but firmware ignores them |
 | Direct LAN (Ethernet) | 192.168.123.161 | Responds briefly then drops; not usable on Air without firmware mod |
 | CycloneDDS topics | DDS over LAN | Requires EDU or firmware unlock |
 | Speaker output | audiohub play | **Go2 Air has no speaker hardware** — Pro/EDU only. API accepts play commands and reports `is_playing: True` but no sound is produced. |
 | Microphone stream | WebRTC audio track | No audio frames received — Air has no microphone hardware |
+| Search light toggle | `rt/wirelesscontroller` (L2+Select) | Buttons map correctly but firmware does not toggle the light; no light API found in Sport commands either |
 
 ### Sport Commands — Tested on Go2 Air
 

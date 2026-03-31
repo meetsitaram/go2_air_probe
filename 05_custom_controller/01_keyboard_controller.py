@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-STEP 05 — Virtual Controller
-──────────────────────────────
+STEP 05a — Keyboard Controller
+────────────────────────────────
 Simulates the Unitree wireless controller from your computer keyboard.
 Your keypresses are sent to the Go2 as if they came from the physical controller.
 
@@ -30,8 +30,8 @@ Keyboard map (while script is running):
 ⚠️  SAFETY: Robot will respond to joystick inputs. Keep clear.
 
 Run:
-    python 05_virtual_controller/01_virtual_controller.py --mode ap
-    python 05_virtual_controller/01_virtual_controller.py --mode ap --dry-run
+    python 05_custom_controller/01_keyboard_controller.py --mode ap
+    python 05_custom_controller/01_keyboard_controller.py --mode ap --dry-run
 """
 
 import sys
@@ -60,21 +60,23 @@ except ImportError:
     TERMIOS_OK = False  # Windows
 
 
-# ── Button bitmasks (matches Go2 wirelesscontroller key field) ────────────────
-KEY_R2     = 0x0001
-KEY_L2     = 0x0002
-KEY_R1     = 0x0004
-KEY_L1     = 0x0008
-KEY_START  = 0x0010
-KEY_SELECT = 0x0020
-KEY_F1     = 0x0100
-KEY_F2     = 0x0200
-KEY_A      = 0x0400
-KEY_B      = 0x0800
-KEY_X      = 0x1000
-KEY_Y      = 0x2000
-KEY_UP     = 0x4000
-KEY_DOWN   = 0x8000
+# ── Button bitmasks (from unitree_legged_sdk joystick.h xKeySwitchUnion) ──────
+KEY_R1     = 0x0001
+KEY_L1     = 0x0002
+KEY_START  = 0x0004
+KEY_SELECT = 0x0008
+KEY_R2     = 0x0010
+KEY_L2     = 0x0020
+KEY_F1     = 0x0040
+KEY_F2     = 0x0080
+KEY_A      = 0x0100
+KEY_B      = 0x0200
+KEY_X      = 0x0400
+KEY_Y      = 0x0800
+KEY_UP     = 0x1000
+KEY_RIGHT  = 0x2000
+KEY_DOWN   = 0x4000
+KEY_LEFT   = 0x8000
 
 
 class ControllerState:
@@ -137,6 +139,7 @@ def print_state(state: ControllerState):
         ("L1", KEY_L1), ("L2", KEY_L2), ("R1", KEY_R1), ("R2", KEY_R2),
         ("A", KEY_A), ("B", KEY_B), ("X", KEY_X), ("Y", KEY_Y),
         ("F1", KEY_F1), ("F2", KEY_F2),
+        ("Up", KEY_UP), ("Down", KEY_DOWN), ("Left", KEY_LEFT), ("Right", KEY_RIGHT),
     ]:
         if s["keys"] & mask:
             pressed.append(name)
@@ -241,12 +244,12 @@ async def async_connect(conn):
 
 
 def main():
-    p = base_parser("Step 05 — Virtual controller from keyboard")
+    p = base_parser("Step 05a — Keyboard controller")
     p.add_argument("--dry-run", action="store_true",
                    help="Show what would be sent without actually sending")
     args = p.parse_args()
 
-    header(f"STEP 05 — Virtual Controller  [{args.mode.upper()} mode]"
+    header(f"STEP 05a — Keyboard Controller  [{args.mode.upper()} mode]"
            + ("  [DRY RUN]" if args.dry_run else ""))
 
     if not WEBRTC_OK:
@@ -314,7 +317,7 @@ def main():
         asyncio.run_coroutine_threadsafe(conn.disconnect(), loop).result(timeout=5)
         loop.call_soon_threadsafe(loop.stop)
 
-    header("Virtual Controller Summary")
+    header("Keyboard Controller Summary")
     info("F1 / F2 buttons are good candidates for custom arm triggers.")
     info("They are not used by default Go2 locomotion, so you can safely")
     info("listen for them in your arm control code:\n")

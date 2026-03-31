@@ -3,7 +3,7 @@
 run_all.py — Run all probe steps in sequence (dry-run safe)
 ─────────────────────────────────────────────────────────────
 Runs steps 01-04 in order and produces a final capability report.
-Step 05 (virtual controller) is interactive and skipped here.
+Step 05 (custom controller) is interactive and skipped here.
 
 Run:
     python run_all.py --mode ap
@@ -69,8 +69,8 @@ def main():
         icon = f"{GREEN}✅ PASS{RESET}" if passed else f"{RED}❌ FAIL{RESET}"
         print(f"  {icon}  {label}")
 
-    print(f"\n  Step 05 (Virtual Controller) — run manually:")
-    print(f"    python 05_virtual_controller/01_virtual_controller.py --mode {args.mode}"
+    print(f"\n  Step 05 (Custom Controller) — run manually:")
+    print(f"    python 05_custom_controller/01_keyboard_controller.py --mode {args.mode}"
           + (f" --ip {args.ip}" if args.ip else ""))
     print()
 

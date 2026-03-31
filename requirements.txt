@@ -15,6 +15,7 @@ unitree_sdk2py @ git+https://github.com/unitreerobotics/unitree_sdk2_python.git
 
 # Utilities
 numpy
+evdev               # Xbox / USB gamepad input (Linux evdev)
 opencv-python       # camera frame decoding / display
 aiortc              # WebRTC engine (also a dependency of unitree_webrtc_connect)
 flask               # used by LiDAR visualization example
