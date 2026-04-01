@@ -109,10 +109,9 @@ BUTTON_MAP = {
 # (combo_mask, strip_mask, description)
 # When keys & combo_mask == combo_mask, strip_mask bits are cleared before sending.
 BLOCKED_COMBOS = [
-    (KEY_L2 | KEY_B,     KEY_B,     "Damp (LT+B) — motors go limp, robot collapses"),
-    (KEY_R1 | KEY_A,     KEY_A,     "Jump Forward (RB+A)"),
+    (KEY_L2 | KEY_B,     KEY_B,     "Damp (LT+B) — motors off, robot collapses"),
+    (KEY_R1 | KEY_A,     KEY_A,     "Jump forward (RB+A)"),
     (KEY_R1 | KEY_X,     KEY_X,     "Pounce (RB+X)"),
-    (KEY_L2 | KEY_START, KEY_START, "Running mode (LT+Start) — high speed"),
 ]
 
 ALL_SHOULDERS = KEY_L1 | KEY_L2 | KEY_R1 | KEY_R2
@@ -122,6 +121,30 @@ ANY_FACE      = KEY_A  | KEY_B  | KEY_X  | KEY_Y
 COUNTDOWN_SECS = 1.8
 PULSE_TIMES    = [0.0, 0.6, 1.2]   # seconds after combo first detected
 PULSE_MS       = 250               # vibration duration per pulse
+
+# ── Known Go2 button-to-action mapping (longest combo first) ─────────────────
+BUTTON_ACTIONS = [
+    # Shoulder + face combos
+    (KEY_L2 | KEY_A,       "Lock posture (stand/crouch toggle)"),
+    (KEY_L2 | KEY_B,       "Damp (motors off)"),
+    (KEY_L2 | KEY_X,       "Stand up from fall"),
+    (KEY_L2 | KEY_SELECT,  "Searchlight toggle"),
+    (KEY_R2 | KEY_A,       "Stretch"),
+    (KEY_R2 | KEY_B,       "Shake hands"),
+    (KEY_R2 | KEY_Y,       "Love"),
+    (KEY_R1 | KEY_X,       "Pounce"),
+    (KEY_R1 | KEY_A,       "Jump forward"),
+    (KEY_R1 | KEY_B,       "Sit down"),
+    (KEY_L1 | KEY_A,       "Greet"),
+    (KEY_L1 | KEY_B,       "Dance"),
+    # D-pad + Start/Select mode switches
+    (KEY_RIGHT | KEY_START,  "Stair mode 1 (fwd up / bwd down)"),
+    (KEY_LEFT | KEY_SELECT,  "Stair mode 2 (fwd down)"),
+    (KEY_L1 | KEY_SELECT,    "Endurance mode"),
+    # Single buttons
+    (KEY_START,            "Walking mode"),
+    (KEY_SELECT,           "Standing mode"),
+]
 
 # Analog stick config — Xbox Wireless Controller reports 0-65535
 STICK_CENTER = 32768
@@ -225,6 +248,14 @@ class RumbleHelper:
                 pass
 
 
+def _lookup_action(keys: int) -> str:
+    """Return the Go2 action name for the current button combo, or ''."""
+    for combo_mask, action in BUTTON_ACTIONS:
+        if (keys & combo_mask) == combo_mask:
+            return action
+    return ""
+
+
 def print_state(state: ControllerState):
     s = state.to_dict()
     pressed = []
@@ -238,11 +269,15 @@ def print_state(state: ControllerState):
         if s["keys"] & mask:
             pressed.append(name)
 
-    sys.stdout.write(
-        f"\r  LX:{s['lx']:+.2f} LY:{s['ly']:+.2f} | "
+    action = _lookup_action(s["keys"])
+    action_str = f" → {action}" if action else ""
+
+    line = (
+        f"  LX:{s['lx']:+.2f} LY:{s['ly']:+.2f} | "
         f"RX:{s['rx']:+.2f} RY:{s['ry']:+.2f} | "
-        f"Buttons: {', '.join(pressed) if pressed else 'none'}          "
+        f"Buttons: {', '.join(pressed) if pressed else 'none'}{action_str}"
     )
+    sys.stdout.write(f"\r{line}\033[K")
     sys.stdout.flush()
 
 
@@ -414,7 +449,9 @@ def send_loop(conn, state: ControllerState, stop_event: threading.Event,
     blocked_warned = set()
     estop_sent = False
     estop_cd = None  # countdown state: {start, pulses_fired}
-    was_start = False    # track Start button press for walk mode vibration
+    was_start = False    # edge-detect Start press
+    was_select = False   # edge-detect Select press
+    is_walking = False   # True when robot is in walk mode
 
     # Countdown state for --allow-all mode: desc → {start, pulses_fired}
     countdowns = {}
@@ -425,7 +462,7 @@ def send_loop(conn, state: ControllerState, stop_event: threading.Event,
 
     while not stop_event.is_set():
         s = state.to_dict()
-        if speed_limit < 1.0:
+        if speed_limit < 1.0 and is_walking:
             s["lx"] = _clamp(s["lx"])
             s["ly"] = _clamp(s["ly"])
             s["rx"] = _clamp(s["rx"])
@@ -527,11 +564,24 @@ def send_loop(conn, state: ControllerState, stop_event: threading.Event,
                                 rumble.pulse()
                 s["keys"] = keys
 
-        # ── Walk mode vibration: single buzz on Start press ─────────
+        # ── Walk/Stand mode tracking ──────────────────────────────────
         start_pressed = bool(s["keys"] & KEY_START)
-        if rumble and start_pressed and not was_start:
-            rumble.pulse()
+        select_pressed = bool(s["keys"] & KEY_SELECT)
+        if start_pressed and not was_start:
+            is_walking = True
+            limit_note = f"  (speed limit {speed_limit:.0%})" if speed_limit < 1.0 else ""
+            sys.stdout.write(f"\n  [WALK mode]{limit_note}\n")
+            sys.stdout.flush()
+            if rumble:
+                rumble.pulse()
+        if select_pressed and not was_select:
+            is_walking = False
+            sys.stdout.write("\n  [STAND mode]\n")
+            sys.stdout.flush()
+            if rumble:
+                rumble.pulse()
         was_start = start_pressed
+        was_select = select_pressed
 
         if not dry_run:
             try:
@@ -573,19 +623,37 @@ def main():
     import logging
     # Suppress noisy asyncio "Task was destroyed" warnings on shutdown
     logging.getLogger("asyncio").setLevel(logging.CRITICAL)
+    # Suppress unitree_webrtc_connect tracebacks that corrupt our status line
+    logging.getLogger("root").setLevel(logging.CRITICAL)
+    logging.getLogger().setLevel(logging.CRITICAL)
 
     p = base_parser("Step 05b — Xbox controller")
     p.add_argument("--dry-run", action="store_true",
                    help="Show controller input without connecting to robot")
     p.add_argument("--allow-all", action="store_true",
                    help="Disable safety blocklist (allow all button combos)")
-    p.add_argument("--speed-limit", type=float, default=1.0, metavar="0.0-1.0",
-                   help="Cap joystick output (default: 1.0 = full speed)")
+    p.add_argument("--speed-limit", type=float, default=0.5, metavar="0.0-1.0",
+                   help="Cap joystick output (default: 0.5 = half speed)")
     args = p.parse_args()
     args.speed_limit = max(0.0, min(1.0, args.speed_limit))
 
     header(f"STEP 05b — Xbox Controller  [{args.mode.upper()} mode]"
            + ("  [DRY RUN]" if args.dry_run else ""))
+
+    # Monkey-patch the library's broken error handler to print cleanly
+    try:
+        import unitree_webrtc_connect.msgs.error_handler as _eh
+        _orig_handle_error = _eh.handle_error
+        def _safe_handle_error(message):
+            try:
+                _orig_handle_error(message)
+            except Exception:
+                data = message.get("data", "")
+                sys.stdout.write(f"\n  ⚠  Robot error: {data}\n")
+                sys.stdout.flush()
+        _eh.handle_error = _safe_handle_error
+    except Exception:
+        pass
 
     if not WEBRTC_OK:
         fail("unitree_webrtc_connect not installed.")
