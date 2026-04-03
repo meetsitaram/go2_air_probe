@@ -92,7 +92,7 @@ Tested over **WiFi STA mode** (Go2 connected to home router) using
 | Audio control API | `rt/api/audiohub/request` | on demand | Upload, play, delete audio files; query list & play mode. API works but **no speaker on Air**. |
 | Audio player state | `rt/audiohub/player/state` | ~4 Hz | Reports play state, current track — streams even without speaker hardware |
 | Sport mode state (lf) | `rt/lf/sportmodestate` | ~20 Hz | Full robot state: IMU quaternion, velocity, gait mode, error code |
-| LiDAR point cloud | `rt/utlidar/voxel_map_compressed` | ~8 Hz | Compressed voxel map with positions + faces (binary) |
+| LiDAR point cloud | `rt/utlidar/voxel_map_compressed` | ~8 Hz | Compressed voxel occupancy grid; see **LiDAR Point Cloud** section below |
 | Device settings | `rt/multiplestate` | ~0.4 Hz | Brightness, volume, obstacle avoidance switch |
 
 ### What does NOT work on Air
@@ -170,6 +170,70 @@ wrong keys are silently ignored.
 
 > Not all commands are available on Go2 Air — many (flips, handstand, etc.) require
 > Go2 Pro/EDU hardware or specific firmware versions. Unsupported commands are silently ignored.
+
+---
+
+### LiDAR Point Cloud (`voxel_map_compressed`)
+
+The Go2 Air publishes a compressed 3D voxel occupancy grid at ~8 Hz via
+`rt/utlidar/voxel_map_compressed`. The `unitree_webrtc_connect` library
+provides **two decoders** — choosing the right one matters.
+
+#### Native decoder (use this for spatial reasoning)
+
+```python
+conn.datachannel.set_decoder(decoder_type='native')
+conn.datachannel.pub_sub.publish_without_callback("rt/utlidar/switch", "on")
+```
+
+- Decompresses LZ4 data → unpacks a 3D bit array (128×128×38 voxels) →
+  converts set bits to **(x, y, z) world-frame coordinates in meters**
+- Returns `{"points": Nx3 float64 array}` — one point per occupied 5 cm voxel
+- Lightweight: only requires `lz4` + `numpy`, no WASM
+- Typical output: ~21,000 points, X/Y range ±3 m around robot, Z range ~1 m
+
+Use for: obstacle detection, distance queries, occupancy grids, 2D maps.
+
+#### LibVoxel decoder (use this for 3D rendering)
+
+```python
+conn.datachannel.set_decoder(decoder_type='libvoxel')  # default
+```
+
+- Runs a WASM decoder (`wasmtime`) that generates **triangle mesh geometry**
+  (vertices, UVs, face indices) suitable for Three.js / WebGL rendering
+- Returns `{"positions": uint8 buffer, "uvs": ..., "indices": ..., "face_count": ...}`
+- The `positions` buffer contains mesh vertices — **not** voxel centers.
+  Multiple vertices exist per voxel face; interpreting them as raw XYZ
+  coordinates gives nonsensical ranges.
+
+Use for: browser-based 3D visualization (see `plot_lidar_stream.py` example).
+
+#### Message metadata
+
+Each message includes metadata alongside the decoded data:
+
+| Field | Example | Description |
+|-------|---------|-------------|
+| `resolution` | `0.05` | Voxel size in meters (5 cm cubes) |
+| `origin` | `[-3.375, -3.025, -0.575]` | World-frame origin of the voxel grid |
+| `width` | `[128, 128, 38]` | Grid dimensions (X, Y, Z) |
+
+#### Coordinate system
+
+Points from the native decoder are in the **SLAM world frame** (same as
+`rt/utlidar/robot_pose`). To get robot-relative coordinates:
+
+1. Subtract robot position `(rx, ry, rz)` from each point
+2. Rotate by `-yaw` to align with the robot's forward axis
+3. Filter by height (e.g., 0.08–0.6 m above robot) for obstacle detection
+
+#### Test scripts
+
+| Script | Purpose |
+|--------|---------|
+| `02_webrtc/05_lidar_pointcloud_probe.py` | Verify which LiDAR topics are publishing |
+| `02_webrtc/06_voxel_debug.py` | Inspect raw decoded point cloud data (native decoder) |
 
 ---
 
