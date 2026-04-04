@@ -47,7 +47,7 @@ def base_parser(description: str) -> argparse.ArgumentParser:
     p.add_argument(
         "--mode",
         choices=["ap", "sta", "lan"],
-        default="ap",
+        default="sta",
         help=(
             "ap  = connected to Go2's own WiFi hotspot (GO2-XXXXXX)\n"
             "sta = Go2 and your computer on same home/lab router\n"
@@ -56,7 +56,7 @@ def base_parser(description: str) -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--ip",
-        default=None,
+        default="192.168.1.133",
         help="Go2 IP address (required for --mode sta). "
              "Find it in the app: Device → Data → STA Network: wlan0",
     )
